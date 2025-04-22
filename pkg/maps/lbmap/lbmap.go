@@ -677,10 +677,10 @@ func getBackend(backend *loadbalancer.Backend, ipv6 bool) (Backend, error) {
 
 	if ipv6 {
 		lbBackend, err = NewBackend6V3(backend.ID, backend.AddrCluster, backend.Port, u8p,
-			backend.State, backend.ZoneID)
+			backend.State, backend.ZoneID, backend.Weight)
 	} else {
 		lbBackend, err = NewBackend4V3(backend.ID, backend.AddrCluster, backend.Port, u8p,
-			backend.State, backend.ZoneID)
+			backend.State, backend.ZoneID, backend.Weight)
 	}
 	if err != nil {
 		return lbBackend, fmt.Errorf("unable to create lbBackend (%d, %s, %d, %t): %w",

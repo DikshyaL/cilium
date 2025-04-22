@@ -1217,6 +1217,9 @@ const (
 	// NodePortAlgRandom is for randomly selecting a backend
 	NodePortAlgRandom = "random"
 
+	
+	NodePortAlgWrr    = "wrr"
+
 	// NodePortAlgMaglev is for using maglev consistent hashing for backend selection
 	NodePortAlgMaglev = "maglev"
 

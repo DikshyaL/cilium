@@ -87,6 +87,7 @@ const (
 	SVCLoadBalancingAlgorithmUndef  SVCLoadBalancingAlgorithm = 0
 	SVCLoadBalancingAlgorithmRandom SVCLoadBalancingAlgorithm = 1
 	SVCLoadBalancingAlgorithmMaglev SVCLoadBalancingAlgorithm = 2
+	SVCLoadBalancingAlgorithmWrr    SVCLoadBalancingAlgorithm = 3
 )
 
 func (d SVCLoadBalancingAlgorithm) String() string {
@@ -95,6 +96,8 @@ func (d SVCLoadBalancingAlgorithm) String() string {
 		return "random"
 	case SVCLoadBalancingAlgorithmMaglev:
 		return "maglev"
+	case SVCLoadBalancingAlgorithmWrr:
+		return "wrr"
 	default:
 		return "undef"
 	}
@@ -106,6 +109,9 @@ func ToSVCLoadBalancingAlgorithm(s string) SVCLoadBalancingAlgorithm {
 	}
 	if s == option.NodePortAlgRandom {
 		return SVCLoadBalancingAlgorithmRandom
+	}
+	if s == option.NodePortAlgWrr {
+		return SVCLoadBalancingAlgorithmWrr
 	}
 	return SVCLoadBalancingAlgorithmUndef
 }

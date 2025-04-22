@@ -387,7 +387,8 @@ func (s *Service4Value) ToHost() ServiceValue {
 }
 
 type Backend4KeyV3 struct {
-	ID loadbalancer.BackendID
+	ID    loadbalancer.BackendID
+	Index uint16
 }
 
 func NewBackend4KeyV3(id loadbalancer.BackendID) *Backend4KeyV3 {
@@ -416,6 +417,7 @@ type Backend4Value struct {
 	Port    uint16          `align:"port"`
 	Proto   u8proto.U8proto `align:"proto"`
 	Flags   uint8           `align:"flags"`
+	Weight  uint16          `align:"weight"`
 }
 
 func NewBackend4Value(ip net.IP, port uint16, proto u8proto.U8proto, state loadbalancer.BackendState) (*Backend4Value, error) {
@@ -472,9 +474,10 @@ type Backend4ValueV3 struct {
 	ClusterID uint16          `align:"cluster_id"`
 	Zone      uint8           `align:"zone"`
 	Pad       uint8           `align:"pad"`
+	Weight    uint16          `align:"weight"`
 }
 
-func NewBackend4ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8) (*Backend4ValueV3, error) {
+func NewBackend4ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8, weight uint16) (*Backend4ValueV3, error) {
 	addr := addrCluster.Addr()
 	if !addr.Is4() {
 		return nil, fmt.Errorf("Not an IPv4 address")
@@ -493,6 +496,7 @@ func NewBackend4ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8pr
 		Flags:     flags,
 		ClusterID: uint16(clusterID),
 		Zone:      zone,
+		Weight:    weight,
 	}
 
 	ip4Array := addr.As4()
@@ -520,9 +524,11 @@ func (b *Backend4ValueV3) GetProtocol() uint8 { return uint8(b.Proto) }
 func (b *Backend4ValueV3) GetFlags() uint8    { return b.Flags }
 func (b *Backend4ValueV3) GetZone() uint8     { return b.Zone }
 
+//ToNetwork converts ports and weights from backend to host byte order
 func (v *Backend4ValueV3) ToNetwork() BackendValue {
 	n := *v
 	n.Port = byteorder.HostToNetwork16(n.Port)
+	n.Weight = byteorder.HostToNetwork16(n.Weight)
 	return &n
 }
 
@@ -530,6 +536,7 @@ func (v *Backend4ValueV3) ToNetwork() BackendValue {
 func (v *Backend4ValueV3) ToHost() BackendValue {
 	h := *v
 	h.Port = byteorder.NetworkToHost16(h.Port)
+	h.Weight = byteorder.HostToNetwork16(h.Weight)
 	return &h
 }
 
@@ -539,8 +546,8 @@ type Backend4V3 struct {
 }
 
 func NewBackend4V3(id loadbalancer.BackendID, addrCluster cmtypes.AddrCluster, port uint16,
-	proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8) (*Backend4V3, error) {
-	val, err := NewBackend4ValueV3(addrCluster, port, proto, state, zone)
+	proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8, weight uint16) (*Backend4V3, error) {
+	val, err := NewBackend4ValueV3(addrCluster, port, proto, state, zone, weight)
 	if err != nil {
 		return nil, err
 	}

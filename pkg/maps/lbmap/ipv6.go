@@ -361,9 +361,10 @@ type Backend6ValueV3 struct {
 	ClusterID uint16          `align:"cluster_id"`
 	Zone      uint8           `align:"zone"`
 	Pad       uint8           `align:"pad"`
+	Weight    uint16          `align:"weight"`
 }
 
-func NewBackend6ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8) (*Backend6ValueV3, error) {
+func NewBackend6ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8, weight uint16) (*Backend6ValueV3, error) {
 	addr := addrCluster.Addr()
 
 	// It is possible to have IPv4 backend in IPv6. We have NAT46/64.
@@ -378,10 +379,11 @@ func NewBackend6ValueV3(addrCluster cmtypes.AddrCluster, port uint16, proto u8pr
 	flags := loadbalancer.NewBackendFlags(state)
 
 	val := Backend6ValueV3{
-		Port:  port,
-		Proto: proto,
-		Flags: flags,
-		Zone:  zone,
+		Port:   port,
+		Proto:  proto,
+		Flags:  flags,
+		Zone:   zone,
+		Weight: weight,
 	}
 
 	ipv6Array := addr.As16()
@@ -412,6 +414,7 @@ func (b *Backend6ValueV3) GetZone() uint8     { return b.Zone }
 func (v *Backend6ValueV3) ToNetwork() BackendValue {
 	n := *v
 	n.Port = byteorder.HostToNetwork16(n.Port)
+	n.Weight = byteorder.HostToNetwork16(n.Weight)
 	return &n
 }
 
@@ -419,6 +422,7 @@ func (v *Backend6ValueV3) ToNetwork() BackendValue {
 func (v *Backend6ValueV3) ToHost() BackendValue {
 	h := *v
 	h.Port = byteorder.NetworkToHost16(h.Port)
+	h.Weight = byteorder.HostToNetwork16(h.Weight)
 	return &h
 }
 
@@ -428,8 +432,8 @@ type Backend6V3 struct {
 }
 
 func NewBackend6V3(id loadbalancer.BackendID, addrCluster cmtypes.AddrCluster, port uint16,
-	proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8) (*Backend6V3, error) {
-	val, err := NewBackend6ValueV3(addrCluster, port, proto, state, zone)
+	proto u8proto.U8proto, state loadbalancer.BackendState, zone uint8, weight uint16) (*Backend6V3, error) {
+	val, err := NewBackend6ValueV3(addrCluster, port, proto, state, zone, weight)
 	if err != nil {
 		return nil, err
 	}

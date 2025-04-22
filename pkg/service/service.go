@@ -584,7 +584,7 @@ func (s *Service) populateBackendMapV3FromV2(ipv4, ipv6 bool) error {
 					v1BackendVal.Port,
 					v1BackendVal.Proto,
 					lb.GetBackendStateFromFlags(v1BackendVal.Flags),
-					0,
+					0, lb.DefaultBackendWeight,
 				)
 				if err != nil {
 					s.logger.Debug(
@@ -603,7 +603,7 @@ func (s *Service) populateBackendMapV3FromV2(ipv4, ipv6 bool) error {
 					v1BackendVal.Port,
 					v1BackendVal.Proto,
 					lb.GetBackendStateFromFlags(v1BackendVal.Flags),
-					0,
+					0, lb.DefaultBackendWeight,
 				)
 				if err != nil {
 					s.logger.Debug(

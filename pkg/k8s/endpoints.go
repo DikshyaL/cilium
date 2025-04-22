@@ -4,6 +4,7 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	cmtypes "github.com/cilium/cilium/pkg/clustermesh/types"
 	slim_corev1 "github.com/cilium/cilium/pkg/k8s/slim/k8s/api/core/v1"
@@ -24,6 +26,8 @@ import (
 	"github.com/cilium/cilium/pkg/logging/logfields"
 	"github.com/cilium/cilium/pkg/metrics"
 	serviceStore "github.com/cilium/cilium/pkg/service/store"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Endpoints is an abstraction for the Kubernetes endpoints object. Endpoints
@@ -102,6 +106,7 @@ type Backend struct {
 	HintsForZones []string
 	Preferred     bool
 	Zone          string
+	Weight        uint16
 }
 
 // String returns the string representation of an endpoints resource, with
@@ -305,6 +310,30 @@ func parseEndpointPortV1Beta1(port slim_discovery_v1beta1.EndpointPort) (string,
 	return name, lbPort
 }
 
+func lookupPodByIP(ip string) *corev1.Pod {
+	config, err := clientcmd.BuildConfigFromFlags("", clientcmd.RecommendedHomeFile)
+	if err != nil {
+		panic(err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err)
+	}
+
+	pods, err := clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, pod := range pods.Items {
+		if pod.Status.PodIP == ip {
+			return &pod
+		}
+	}
+	return nil
+}
+
 // ParseEndpointSliceV1 parses a Kubernetes EndpointSlice resource.
 // It reads ready and terminating state of endpoints in the EndpointSlice to
 // return an EndpointSlice ID and a filtered list of Endpoints for service load-balancing.
@@ -371,6 +400,16 @@ func ParseEndpointSliceV1(logger *slog.Logger, ep *slim_discovery_v1.EndpointSli
 			backend, ok := endpoints.Backends[addrCluster]
 			if !ok {
 				backend = &Backend{Ports: serviceStore.PortConfiguration{}}
+				weight := uint16(0)
+				pod := lookupPodByIP(addrCluster.Addr().String())
+				if pod != nil {
+					if wStr, ok := pod.Labels["cilium.io/lb-weight"]; ok {
+						if w, err := strconv.Atoi(wStr); err == nil {
+							weight = uint16(w)
+						}
+					}
+				}
+				backend.Weight = weight
 				endpoints.Backends[addrCluster] = backend
 				if sub.NodeName != nil {
 					backend.NodeName = *sub.NodeName

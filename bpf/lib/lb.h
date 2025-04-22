@@ -776,6 +776,31 @@ lb6_select_backend_id_maglev(struct __ctx_buff *ctx __maybe_unused,
 	return map_array_get_32(backend_ids, index, (LB_MAGLEV_LUT_SIZE - 1) << 2);
 }
 #endif  /* defined(LB_SELECTION_PER_SERVICE) || LB_SELECTION == LB_SELECTION_RANDOM */
+#if defined(LB_SELECTION_PER_SERVICE) || LB_SELECTION == LB_SELECTION_WRR
+static __always_inline __u32
+lb6_select_backend_id_wrr(struct __ctx_buff *ctx, struct lb6_key *key,
+                          const struct ipv6_ct_tuple *tuple __maybe_unused,
+                          const struct lb6_service *svc)
+{
+    __u32 total_weight = 0;
+    __u32 rnd = get_prandom_u32();
+    struct lb6_service *be;
+    __u16 slot;
+
+    /* Backend slot 0 is reserved for service frontend */
+    for (slot = 1; slot <= svc->count; slot++) {
+        be = lb6_lookup_backend_slot(ctx, key, slot);
+        if (!be)
+            continue;
+        
+        total_weight += be->weight;
+        if (rnd % total_weight < be->weight)
+            return be->backend_id;
+    }
+    
+    return 0; // Fallback if all weights are zero
+}
+#endif
 
 #ifdef LB_SELECTION_PER_SERVICE
 static __always_inline __u32 lb6_algorithm(const struct lb6_service *svc)
@@ -793,6 +818,8 @@ lb6_select_backend_id(struct __ctx_buff *ctx, struct lb6_key *key,
 		return lb6_select_backend_id_maglev(ctx, key, tuple, svc);
 	case LB_SELECTION_RANDOM:
 		return lb6_select_backend_id_random(ctx, key, tuple, svc);
+	case LB_SELECTION_WRR:  // Add this case
+        return lb6_select_backend_id_wrr(ctx, key, tuple, svc);
 	default:
 		return 0;
 	}
@@ -801,6 +828,8 @@ lb6_select_backend_id(struct __ctx_buff *ctx, struct lb6_key *key,
 # define lb6_select_backend_id	lb6_select_backend_id_random
 #elif LB_SELECTION == LB_SELECTION_MAGLEV
 # define lb6_select_backend_id	lb6_select_backend_id_maglev
+#elif LB_SELECTION == LB_SELECTION_WRR  // Add this condition
+# define lb6_select_backend_id lb6_select_backend_id_wrr
 #elif LB_SELECTION == LB_SELECTION_FIRST
 /* Backend selection for tests that always chooses first slot. */
 static __always_inline __u32
@@ -1477,6 +1506,46 @@ lb4_select_backend_id_random(struct __ctx_buff *ctx,
 	return be ? be->backend_id : 0;
 }
 #endif /* LB_SELECTION_PER_SERVICE || LB_SELECTION == LB_SELECTION_RANDOM */
+#if defined(LB_SELECTION_PER_SERVICE) || LB_SELECTION == LB_SELECTION_WRR
+static __always_inline __u32
+lb4_select_backend_id_wrr(struct __ctx_buff *ctx, struct lb4_key *key,
+                          const struct ipv4_ct_tuple *tuple __maybe_unused,
+                          const struct lb4_service *svc)
+{
+    __u32 total_weight = 0;
+    __u32 rnd, accumulated = 0;
+    struct lb4_service *be_svc;
+    struct lb4_backend *backend;
+    __u16 slot;
+
+    // First pass: Calculate total weight
+    #pragma unroll
+    for (slot = 1; slot <= 64; slot++) {  // Fixed upper bound
+        if (slot > svc->count) break;
+        be_svc = lb4_lookup_backend_slot(ctx, key, slot);
+        if (!be_svc) continue;
+        backend = lb4_lookup_backend(ctx, be_svc->backend_id);
+        if (backend) total_weight += backend->weight;
+    }
+
+    if (total_weight == 0) return 0;
+
+    // Second pass: Select backend
+    rnd = get_prandom_u32() % total_weight;
+    #pragma unroll
+    for (slot = 1; slot <= 64; slot++) {  // Fixed upper bound
+        if (slot > svc->count) break;
+        be_svc = lb4_lookup_backend_slot(ctx, key, slot);
+        if (!be_svc) continue;
+        backend = lb4_lookup_backend(ctx, be_svc->backend_id);
+        if (!backend) continue;
+        accumulated += backend->weight;
+        if (rnd < accumulated) return be_svc->backend_id;
+    }
+    return 0;
+}
+
+#endif
 
 #if defined(LB_SELECTION_PER_SERVICE) || LB_SELECTION == LB_SELECTION_MAGLEV
 static __always_inline __u32
@@ -1524,6 +1593,8 @@ lb4_select_backend_id(struct __ctx_buff *ctx, struct lb4_key *key,
 		return lb4_select_backend_id_maglev(ctx, key, tuple, svc);
 	case LB_SELECTION_RANDOM:
 		return lb4_select_backend_id_random(ctx, key, tuple, svc);
+	case LB_SELECTION_WRR:  // Add this case
+        return lb4_select_backend_id_wrr(ctx, key, tuple, svc);
 	default:
 		return 0;
 	}
@@ -1532,6 +1603,8 @@ lb4_select_backend_id(struct __ctx_buff *ctx, struct lb4_key *key,
 # define lb4_select_backend_id	lb4_select_backend_id_random
 #elif LB_SELECTION == LB_SELECTION_MAGLEV
 # define lb4_select_backend_id	lb4_select_backend_id_maglev
+#elif LB_SELECTION == LB_SELECTION_WRR  // Add this condition
+# define lb4_select_backend_id lb4_select_backend_id_wrr
 #elif LB_SELECTION == LB_SELECTION_FIRST
 /* Backend selection for tests that always chooses first slot. */
 static __always_inline __u32
@@ -1748,6 +1821,7 @@ lb4_skip_xlate_from_ctx_to_svc(__net_cookie cookie,
 	return false;
 }
 #endif /* ENABLE_LOCAL_REDIRECT_POLICY */
+
 
 static __always_inline int lb4_local(const void *map, struct __ctx_buff *ctx,
 				     int l3_off, fraginfo_t fraginfo, int l4_off,

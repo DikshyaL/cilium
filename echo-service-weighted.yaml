@@ -1,0 +1,21 @@
+apiVersion: cilium.io/v2
+kind: CiliumEnvoyConfig
+metadata:
+  name: echo-service-weighted
+spec:
+  services:
+  - name: echo-service
+    namespace: default
+    ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+  backendServices:
+  - name: echo-service-v1
+    namespace: default
+    port: 8080
+    weight: 70
+  - name: echo-service-v2
+    namespace: default
+    port: 8080
+    weight: 30

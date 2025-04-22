@@ -989,6 +989,7 @@ struct lb6_service {
 	__u8 flags;
 	__u8 flags2;
 	__u16 qcount;
+	__u16 weight;
 };
 
 /* See lb4_backend comments */
@@ -1003,6 +1004,7 @@ struct lb6_backend {
 				 */
 	__u8 zone;
 	__u8 pad;
+	__u16 weight;
 };
 
 struct lb6_health {
@@ -1070,6 +1072,7 @@ struct lb4_service {
 	 * slots under quarantine (otherwise zero).
 	 */
 	__u16 qcount;
+	__u16 weight;
 };
 
 struct lb4_backend {
@@ -1083,6 +1086,7 @@ struct lb4_backend {
 				 */
 	__u8 zone;
 	__u8 pad;
+	__u16 weight;
 };
 
 struct lb4_health {
