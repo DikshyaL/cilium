@@ -61,6 +61,7 @@ struct {
 	__type(value, struct lb_affinity_val);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 	__uint(max_entries, CILIUM_LB_AFFINITY_MAP_MAX_ENTRIES);
+	__uint(map_flags, LRU_MEM_FLAVOR);
 } cilium_lb6_affinity __section_maps_btf;
 #endif
 
@@ -82,6 +83,7 @@ struct {
 	__type(value, struct lb6_health);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 	__uint(max_entries, CILIUM_LB_BACKENDS_MAP_MAX_ENTRIES);
+	__uint(map_flags, LRU_MEM_FLAVOR);
 } cilium_lb6_health __section_maps_btf;
 #endif
 
@@ -148,6 +150,7 @@ struct {
 	__type(value, struct lb_affinity_val);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 	__uint(max_entries, CILIUM_LB_AFFINITY_MAP_MAX_ENTRIES);
+	__uint(map_flags, LRU_MEM_FLAVOR);
 } cilium_lb4_affinity __section_maps_btf;
 #endif
 
@@ -169,6 +172,7 @@ struct {
 	__type(value, struct lb4_health);
 	__uint(pinning, LIBBPF_PIN_BY_NAME);
 	__uint(max_entries, CILIUM_LB_BACKENDS_MAP_MAX_ENTRIES);
+	__uint(map_flags, LRU_MEM_FLAVOR);
 } cilium_lb4_health __section_maps_btf;
 #endif
 
@@ -1139,12 +1143,10 @@ static __always_inline int lb6_local(const void *map, struct __ctx_buff *ctx,
 
 	ipv6_addr_copy(&tuple->daddr, &backend->address);
 
-	if (lb6_svc_is_l7_punt_proxy(svc)) {
-		if (__lookup_ip6_endpoint(&backend->address)) {
-			ctx_skip_nodeport_set(ctx);
-			ret = LB_PUNT_TO_STACK;
-			goto drop_err;
-		}
+	if (lb6_svc_is_l7_punt_proxy(svc) &&
+	    __lookup_ip6_endpoint(&backend->address)) {
+		ctx_skip_nodeport_set(ctx);
+		return LB_PUNT_TO_STACK;
 	}
 	if (skip_xlate)
 		return CTX_ACT_OK;
@@ -1973,12 +1975,10 @@ static __always_inline int lb4_local(const void *map, struct __ctx_buff *ctx,
 #endif
 		tuple->daddr = backend->address;
 
-	if (lb4_svc_is_l7_punt_proxy(svc)) {
-		if (__lookup_ip4_endpoint(backend->address)) {
-			ctx_skip_nodeport_set(ctx);
-			ret = LB_PUNT_TO_STACK;
-			goto drop_err;
-		}
+	if (lb4_svc_is_l7_punt_proxy(svc) &&
+	    __lookup_ip4_endpoint(backend->address)) {
+		ctx_skip_nodeport_set(ctx);
+		return LB_PUNT_TO_STACK;
 	}
 	if (skip_xlate)
 		return CTX_ACT_OK;

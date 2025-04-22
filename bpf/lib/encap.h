@@ -13,15 +13,6 @@
 #endif /* __ctx_is == __ctx_skb */
 
 #ifdef HAVE_ENCAP
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, struct tunnel_key);
-	__type(value, struct tunnel_value);
-	__uint(pinning, LIBBPF_PIN_BY_NAME);
-	__uint(max_entries, TUNNEL_ENDPOINT_MAP_SIZE);
-	__uint(map_flags, CONDITIONAL_PREALLOC);
-} cilium_tunnel_map __section_maps_btf;
-
 static __always_inline int
 __encap_with_nodeid4(struct __ctx_buff *ctx, __u32 src_ip, __be16 src_port,
 		     __be32 tunnel_endpoint,
@@ -110,13 +101,6 @@ encap_and_redirect_with_nodeid(struct __ctx_buff *ctx,
 			       __u32 seclabel, __u32 dstid,
 			       const struct trace_ctx *trace)
 {
-#ifdef ENABLE_IPSEC
-	if (encrypt_key)
-		return set_ipsec_encrypt(ctx, encrypt_key,
-					 info->tunnel_endpoint.ip4, seclabel,
-					 true, false);
-#endif
-
 	return __encap_and_redirect_with_nodeid(ctx, info, seclabel, dstid,
 						NOT_VTEP_DST, trace);
 }
@@ -137,9 +121,6 @@ encap_and_redirect_lxc(struct __ctx_buff *ctx,
 		       __u32 seclabel, __u32 dstid,
 		       const struct trace_ctx *trace)
 {
-	if (!info || !info->flag_has_tunnel_ep)
-		return DROP_NO_TUNNEL_ENDPOINT;
-
 	return encap_and_redirect_with_nodeid(ctx, info, encrypt_key, seclabel,
 					      dstid, trace);
 }
